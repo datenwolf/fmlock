@@ -103,6 +103,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	fprintf(stderr, "Files locked and cache heated up. Going to sleep, .zZ...\n");
+
 	/* At this point the program shall sleep until a terminating
 	 * signal arrives. To do so a nice side effect of the definition
 	 * of /dev/null behavior is used: read on a /dev/null fd always

@@ -1,12 +1,17 @@
-== fmlock -- map a file into memory and lock it to RAM ==
+== fmlock -- map files into memory and lock them to RAM ==
 
-fmlock is a small tool intended to load a file into the
-block I/O cache and lock it there. This is done by mmap-ing
-the whole file and calling mlock on the address space
-occupied by the file. Then the program puts itself to sleep
-until a signal arrives. The purpose of this is that (large)
-files can be preloaded into RAM, specifically the block I/O
-cache for other processes to read from. This is for example
-required to measure the RAM bandwidth and CPU limited
-throughput of data processing code, working on real data
-without getting effected by I/O bottlenecks.
+fmlock is a small tool intended to load file into the block I/O cache and lock
+them there. This is done by mmap-ing the whole file and calling mlock on the
+address space occupied by the file. In addition the whole file is read to heat
+the cache; this should not be necessary, but some systems may require this, for
+this tool to be effective.o
+
+Once the files are locked into memory and the cache is hot the program puts
+itself to sleep until a signal arrives. Once the program is sleeping that's it.
+Any changes to the files that'd require to remap the files are not caught by
+fmlock and the cache on any changed or grown pages may become cold over time.
+
+The purpose of this is that (large) files can be preloaded into RAM, namely the
+block I/O cache for other processes to read from. This is for example required
+to measure the RAM bandwidth and CPU limited throughput of data processing code,
+working on real data without getting effected by I/O bottlenecks.
