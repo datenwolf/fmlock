@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/resource.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stddef.h>
@@ -26,23 +27,40 @@ int heat_the_cache(int fd)
 
 int main(int argc, char *argv[])
 {
-	int i, fd_null, n_fileslocked;
+	unsigned long long locked_memory;
+	int i, fd_null;
 	fd_set phony_fdset;
-	char *buf;
+	struct rlimit mlock_limit;
 
 	if( 2 > argc ) {
 		fprintf(stderr,
-			"Usage:\n%s [filenames]\n",
+			"Usage:\n\n"
+			"%s [filenames]\n\n"
+			"Once its deed is done kill the process by sending a terminating signal.\n"
+			"SIGINT (Ctrl+C) on the controlling terminal should do the trick.\n",
 			argv[0] );
 		return 1;
 	}
 
-	n_fileslocked = 0;
+	if( -1 == getrlimit(RLIMIT_MEMLOCK, &mlock_limit) ) {
+		fprintf(stderr,
+			"error getrlimit(RLIMIT_MEMLOCK): %s\n",
+			strerror(errno) );
+		return 1;
+	}
+	fprintf(stderr,
+		"memlock rlimit: %llu\n",
+		(unsigned long long)mlock_limit.rlim_cur );
+
+	locked_memory = 0;
 	for(i = 1; i < argc; ++i) {
 		char const * const filename = argv[i];
 		int fd;
 		struct stat st;
 		void *ptr;
+
+		fprintf(stderr,
+			"mlocking '%s'... ", filename);
 
 	retry_open:
 		fd = open(filename, O_RDONLY);
@@ -65,6 +83,19 @@ int main(int argc, char *argv[])
 				filename,
 				strerror(errno) );
 			goto finish_file;
+		}
+
+		if( locked_memory + st.st_size > mlock_limit.rlim_cur ) {
+			fprintf(stderr,
+				"error: exceeded the memlock resource limit for this process.\n"
+				"Required limit to mlock '%s': %llu (counting already mlocked files)\n"
+				"Locked memory resource limit set to: %llu\n"
+				"Increase the locked memory resource limit and try again.\n",
+				filename,
+				(unsigned long long)locked_memory + st.st_size,
+				(unsigned long long)mlock_limit.rlim_cur );
+			close(fd);
+			break;
 		}
 
 		ptr = mmap(
@@ -91,19 +122,31 @@ int main(int argc, char *argv[])
 				strerror(errno) );
 			goto finish_file;
 		}
-		++n_fileslocked;
+
+		if( locked_memory + st.st_size < locked_memory ) {
+			/* overflow */
+			locked_memory = -1;
+		} else
+		{
+			locked_memory += st.st_size;
+		}
 
 		heat_the_cache(fd);
 
 	finish_file:
 		close(fd);
+		fputs("done\n", stderr);
 	}
 
-	if( !n_fileslocked ) {
+	if( !locked_memory ) {
+		fprintf(stderr,
+			"nothing locked, exiting.\n");
 		return 1;
 	}
 
-	fprintf(stderr, "Files locked and cache heated up. Going to sleep, .zZ...\n");
+	fprintf(stderr,
+		"Files locked and cache heated up. pid=%lld. Going to sleep, .zZ...\n",
+		(long long)getpid() );
 
 	/* At this point the program shall sleep until a terminating
 	 * signal arrives. To do so a nice side effect of the definition
