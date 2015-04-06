@@ -205,3 +205,8 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+/* == Crazy Credits ==
+ * Music listend to while writing this program:
+ *     Carbon Based Lifeforms - Twentythree
+ */
