@@ -41,7 +41,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <errno.h>
 #include <string.h>
 
-int heat_the_cache(int fd)
+static int heat_the_cache(int fd)
 {
 	char buf[1024];
 	int rv;
